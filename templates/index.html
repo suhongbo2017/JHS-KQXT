@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考勤查询系统</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-top: 15vh;
+            font-size: 32px;
+            font-weight: 600;
+        }
+
+        .form-container {
+            background-color: #ffffff;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+            width: 320px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+
+        input[type="month"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #dcdde1;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+
+        input[type="month"]:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        #message {
+            margin-top: 15px;
+            font-size: 14px;
+            min-height: 20px;
+        }
+
+        .error { color: #e74c3c; }
+        .success { color: #2ecc71; }
+        .loading { color: #f39c12; }
+    </style>
+</head>
+<body>
+    <h1>考勤查询系统</h1>
+    <div class="form-container">
+        <div class="form-group">
+            <label for="query_date">请选择查询的月份：</label>
+            <input type="month" id="query_date" name="query_date" required>
+        </div>
+        <button id="submitBtn" onclick="generateExcel()">生成并下载 Excel</button>
+        <div id="message"></div>
+    </div>
+
+    <script>
+        async function generateExcel() {
+            const queryDate = document.getElementById('query_date').value;
+            const messageEl = document.getElementById('message');
+            const submitBtn = document.getElementById('submitBtn');
+
+            if (!queryDate) {
+                messageEl.className = 'error';
+                messageEl.textContent = '请先选择查询月份！';
+                return;
+            }
+
+            messageEl.className = 'loading';
+            messageEl.textContent = '正在查询数据并生成文件，请稍候...';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/generate?query_date=${queryDate}`);
+                
+                if (response.ok) {
+                    let filename = `${queryDate}_attendance.xlsx`;
+                    const disposition = response.headers.get('Content-Disposition');
+                    if (disposition && disposition.includes('filename=')) {
+                        filename = disposition.split('filename=')[1].replace(/"/g, '');
+                    }
+
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    
+                    messageEl.className = 'success';
+                    messageEl.textContent = '文件下载成功！';
+                } else {
+                    const data = await response.json();
+                    messageEl.className = 'error';
+                    messageEl.textContent = data.error || '生成失败，请检查所选月份是否有数据。';
+                }
+            } catch (error) {
+                messageEl.className = 'error';
+                messageEl.textContent = '网络错误，请稍后再试。';
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
