@@ -1,20 +1,23 @@
-# 排除列表（不上传的文件/文件夹）
-# Jupyter checkpoint
-.ipynb_checkpoints/
-# Python 编译缓存
+# Byte-compiled / optimized / cache
 __pycache__/
 *.pyc
 *.pyo
-# 临时生成的 Excel 数据（考勤结果）
-*.xlsx
-# PyInstaller 打包产物
-build/
-Dist/
+
+# Build artifacts
 *.spec
-# 日志文件
+/build/
+/dist/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Data files (large Excel/CSV)
+*.xlsx
+*.xls
+*.csv
+
+# Temporary or personal files
 *.log
-# Jupyter notebook（如果不需要）
-*.ipynb
-# 其他临时文件
-Thumbs.db
-.DS_Store
+*.txt
+
+temp/
