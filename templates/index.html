@@ -5,156 +5,215 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>考勤查询系统</title>
     <style>
+        /* ------------------- 全局美化（现代、柔和） ------------------- */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f4f8;
-            color: #333;
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f0f4f8, #e2e8f0);
+            color: #2c3e50;
             margin: 0;
-            padding: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
-            height: 100vh;
+            min-height: 100vh;
+            padding: 2rem;
         }
-
-        h1 {
-            text-align: center;
-            color: #2c3e50;
-            margin-top: 15vh;
-            font-size: 32px;
-            font-weight: 600;
-        }
-
+        h1 { font-size: 2.4rem; margin-bottom: 1rem; }
         .form-container {
-            background-color: #ffffff;
+            background: rgba(255,255,255,0.95);
             border-radius: 12px;
-            padding: 30px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
-            width: 320px;
-            text-align: center;
+            padding: 2rem;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.07);
+            width: 340px;
+            max-width: 90%;
         }
-
-        .form-group {
-            margin-bottom: 20px;
-            text-align: left;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-size: 14px;
-        }
-
-        input[type="month"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #dcdde1;
-            border-radius: 6px;
-            font-size: 16px;
-            box-sizing: border-box;
-            transition: border-color 0.3s;
-        }
-
-        input[type="month"]:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #3498db;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-
-        button:hover {
-            background-color: #2980b9;
-        }
-
-        button:disabled {
-            background-color: #95a5a6;
-            cursor: not-allowed;
-        }
-
-        #message {
-            margin-top: 15px;
-            font-size: 14px;
-            min-height: 20px;
-        }
-
-        .error { color: #e74c3c; }
+        .form-group { margin-bottom: 1.2rem; }
+        label { display: block; margin-bottom: .4rem; font-weight: 500; color: #555; }
+        input[type="month"] { width: 100%; padding: .8rem; border: 1px solid #dcdde1; border-radius: 6px; font-size: 1rem; transition: border .25s; }
+        input[type="month"]:focus { outline: none; border-color: #3498db; }
+        button { width: 100%; padding: .9rem; background: #3498db; color: #fff; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: background .25s; }
+        button:hover { background: #2980b9; }
+        button:disabled { background: #95a5a6; cursor: not-allowed; }
+        #message { margin-top: .8rem; min-height: 1.2rem; font-size: .95rem; }
+        .error   { color: #e74c3c; }
         .success { color: #2ecc71; }
         .loading { color: #f39c12; }
+        /* Spinner */
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* 圆形进度条 */
+        .circular-progress {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            margin: 20px auto;
+        }
+        .circular-progress svg { transform: rotate(-90deg); width: 100%; height: 100%; }
+        .circular-progress circle { fill: none; stroke-width: 8; }
+        .circular-bg { stroke: #e6e6e6; }
+        .circular-fg { stroke: #3498db; stroke-linecap: round; transition: stroke-dashoffset 0.3s; }
+        .circular-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 1rem; color: #2c3e50; text-align: center; }
+        .countdown-text { font-size: 0.9rem; color: #555; margin-top: 8px; text-align: center; }
+        /* Modal overlay */
+        .progress-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-box { background: #fff; padding: 2rem; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); max-width: 90%; }
     </style>
 </head>
 <body>
     <h1>考勤查询系统</h1>
     <div class="form-container">
         <div class="form-group">
-            <label for="query_date">请选择查询的月份：</label>
-            <input type="month" id="query_date" name="query_date" required>
+            <label for="queryDate">选择月份</label>
+            <input type="month" id="queryDate">
         </div>
-        <button id="submitBtn" onclick="generateExcel()">生成并下载 Excel</button>
+        <button id="submitBtn">生成考勤报表</button>
+        <button id="cancelBtn" style="margin-top:0.5rem; background:#e74c3c;">取消</button>
         <div id="message"></div>
     </div>
 
-    <script>
-        async function generateExcel() {
-            const queryDate = document.getElementById('query_date').value;
-            const messageEl = document.getElementById('message');
-            const submitBtn = document.getElementById('submitBtn');
+    <!-- Modal for progress -->
+    <div id="progressModal" class="progress-modal">
+        <div class="modal-box">
+            <div class="spinner" id="spinner"></div>
+            <div class="circular-progress" id="circularProgress" style="display:none;">
+                <svg viewBox="0 0 100 100">
+                    <circle class="circular-bg" cx="50" cy="50" r="45"></circle>
+                    <circle class="circular-fg" cx="50" cy="50" r="45" stroke-dasharray="283" stroke-dashoffset="283"></circle>
+                </svg>
+                <div class="circular-text" id="circularText">0%</div>
+                <div class="countdown-text" id="countdownText"></div>
+            </div>
+        </div>
+    </div>
 
+    <script type="module">
+        const submitBtn = document.getElementById('submitBtn');
+        const queryInput = document.getElementById('queryDate');
+        const messageEl = document.getElementById('message');
+        const progressModal = document.getElementById('progressModal');
+        const spinner = document.getElementById('spinner');
+        const circularProgress = document.getElementById('circularProgress');
+        const circularFg = circularProgress.querySelector('.circular-fg');
+        const circularText = document.getElementById('circularText');
+        const countdownText = document.getElementById('countdownText');
+        const cancelBtn = document.getElementById('cancelBtn');
+
+        const ESTIMATED_TIME = 8000; // fallback estimate in ms
+        let estimateTimer = null;
+        let estimateStart = null;
+        let abortController = null;
+
+        async function handleSubmit() {
+            const queryDate = queryInput.value;
             if (!queryDate) {
                 messageEl.className = 'error';
                 messageEl.textContent = '请先选择查询月份！';
                 return;
             }
-
+            // UI init
             messageEl.className = 'loading';
             messageEl.textContent = '正在查询数据并生成文件，请稍候...';
             submitBtn.disabled = true;
+            progressModal.style.display = 'flex';
+            spinner.style.display = 'block';
+            circularProgress.style.display = 'none';
+            circularText.textContent = '0%';
+            countdownText.textContent = '';
+
+            abortController = new AbortController();
+            // start fallback countdown
+            estimateStart = Date.now();
+            estimateTimer = setInterval(() => {
+                const elapsed = Date.now() - estimateStart;
+                const remaining = Math.max(0, ESTIMATED_TIME - elapsed);
+                const secs = Math.ceil(remaining / 1000);
+                countdownText.textContent = `预计剩余 ${secs}s`;
+            }, 500);
 
             try {
-                const response = await fetch(`/generate?query_date=${queryDate}`);
-                
-                if (response.ok) {
-                    let filename = `${queryDate}_attendance.xlsx`;
-                    const disposition = response.headers.get('Content-Disposition');
-                    if (disposition && disposition.includes('filename=')) {
-                        filename = disposition.split('filename=')[1].replace(/"/g, '');
-                    }
-
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    
-                    messageEl.className = 'success';
-                    messageEl.textContent = '文件下载成功！';
-                } else {
+                const response = await fetch(`/generate?query_date=${encodeURIComponent(queryDate)}`, { signal: abortController.signal });
+                if (!response.ok) {
                     const data = await response.json();
                     messageEl.className = 'error';
                     messageEl.textContent = data.error || '生成失败，请检查所选月份是否有数据。';
+                    return;
                 }
+                const totalSizeHeader = response.headers.get('Content-Length');
+                const totalSize = totalSizeHeader ? parseInt(totalSizeHeader) : null;
+                if (totalSize) {
+                    spinner.style.display = 'none';
+                    circularProgress.style.display = 'block';
+                }
+                const reader = response.body.getReader();
+                let received = 0;
+                const chunks = [];
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    chunks.push(value);
+                    received += value.length;
+                    if (totalSize) {
+                        const percent = Math.min(100, Math.round((received / totalSize) * 100));
+                        const offset = 283 - (283 * percent) / 100;
+                        circularFg.setAttribute('stroke-dashoffset', offset);
+                        circularText.textContent = `${percent}%`;
+                        const mbReceived = (received / (1024 * 1024)).toFixed(2);
+                        const mbTotal = (totalSize / (1024 * 1024)).toFixed(2);
+                        countdownText.textContent = `${mbReceived} MB / ${mbTotal} MB`;
+                    } else {
+                        const mbReceived = (received / (1024 * 1024)).toFixed(2);
+                        countdownText.textContent = `${mbReceived} MB 已接收`;
+                    }
+                }
+                const blob = new Blob(chunks);
+                // Resolve filename
+                let filename = `${queryDate}_attendance.xlsx`;
+                const disposition = response.headers.get('Content-Disposition');
+                if (disposition && /filename\*?=/.test(disposition)) {
+                    const match = disposition.match(/filename\*?=([^;]+)/i);
+                    if (match) {
+                        filename = decodeURIComponent(match[1].replace(/^UTF-8''/, '').trim().replace(/"/g, ''));
+                    }
+                }
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                messageEl.className = 'success';
+                messageEl.textContent = '文件下载成功！';
             } catch (error) {
-                messageEl.className = 'error';
-                messageEl.textContent = '网络错误，请稍后再试。';
+                console.error(error);
+                if (error.name === 'AbortError') {
+                    messageEl.className = 'error';
+                    messageEl.textContent = '已取消操作。';
+                } else {
+                    messageEl.className = 'error';
+                    messageEl.textContent = '网络错误，请稍后再试。';
+                }
             } finally {
                 submitBtn.disabled = false;
+                clearInterval(estimateTimer);
+                progressModal.style.display = 'none';
             }
         }
+
+        submitBtn.addEventListener('click', handleSubmit);
+        cancelBtn.addEventListener('click', () => {
+            if (abortController) {
+                abortController.abort();
+            }
+        });
     </script>
 </body>
 </html>
