@@ -145,53 +145,19 @@
                     messageEl.textContent = data.error || '生成失败，请检查所选月份是否有数据。';
                     return;
                 }
-                const totalSizeHeader = response.headers.get('Content-Length');
-                const totalSize = totalSizeHeader ? parseInt(totalSizeHeader) : null;
-                if (totalSize) {
-                    spinner.style.display = 'none';
-                    circularProgress.style.display = 'block';
-                }
-                const reader = response.body.getReader();
-                let received = 0;
-                const chunks = [];
-                while (true) {
-                    const {done, value} = await reader.read();
-                    if (done) break;
-                    chunks.push(value);
-                    received += value.length;
-                    if (totalSize) {
-                        const percent = Math.min(100, Math.round((received / totalSize) * 100));
-                        const offset = 283 - (283 * percent) / 100;
-                        circularFg.setAttribute('stroke-dashoffset', offset);
-                        circularText.textContent = `${percent}%`;
-                        const mbReceived = (received / (1024 * 1024)).toFixed(2);
-                        const mbTotal = (totalSize / (1024 * 1024)).toFixed(2);
-                        countdownText.textContent = `${mbReceived} MB / ${mbTotal} MB`;
-                    } else {
-                        const mbReceived = (received / (1024 * 1024)).toFixed(2);
-                        countdownText.textContent = `${mbReceived} MB 已接收`;
-                    }
-                }
-                const blob = new Blob(chunks);
-                // Resolve filename
-                let filename = `${queryDate}_attendance.xlsx`;
-                const disposition = response.headers.get('Content-Disposition');
-                if (disposition && /filename\*?=/.test(disposition)) {
-                    const match = disposition.match(/filename\*?=([^;]+)/i);
-                    if (match) {
-                        filename = decodeURIComponent(match[1].replace(/^UTF-8''/, '').trim().replace(/"/g, ''));
-                    }
-                }
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+                // Expect JSON with download_url
+                const data = await response.json();
+                // Show download link
+                const link = document.createElement('a');
+                link.href = data.download_url;
+                link.textContent = '点击这里下载打包文件';
+                link.style.display = 'inline-block';
+                link.style.marginTop = '1rem';
+                link.style.color = '#2ecc71';
+                link.style.fontWeight = '600';
                 messageEl.className = 'success';
-                messageEl.textContent = '文件下载成功！';
+                messageEl.innerHTML = '';
+                messageEl.appendChild(link);
             } catch (error) {
                 console.error(error);
                 if (error.name === 'AbortError') {

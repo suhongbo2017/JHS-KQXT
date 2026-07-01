@@ -48,7 +48,13 @@ def generate_attendance_excel(query_date):
     
     # 格式化日期确保覆盖整天
     start_date_str = start_date.strftime('%Y-%m-%d 00:00:00')
-    end_date_str = end_date.strftime('%Y-%m-%d 23:59:59')
+
+    # 查询范围延伸到次月1号09:00，覆盖夜班下班打卡
+    if end_date.month == 12:
+        next_month_first = end_date.replace(year=end_date.year + 1, month=1, day=1)
+    else:
+        next_month_first = end_date.replace(month=end_date.month + 1, day=1)
+    end_date_str = next_month_first.strftime('%Y-%m-%d 09:00:00')
 
     try:
         conn = get_db_connection()
@@ -76,6 +82,11 @@ def generate_attendance_excel(query_date):
         """
         
         df = pd.read_sql(sql, conn, params=[start_date_str, end_date_str])
+        # 过滤同一人同一机器号在5分钟内的重复打卡，只保留第一次
+        df.sort_values(['姓名', '机器号', '时间'], inplace=True)
+        df['prev_time'] = df.groupby(['姓名', '机器号'])['时间'].shift()
+        df = df[(df['prev_time'].isna()) | ((df['时间'] - df['prev_time']).dt.total_seconds() > 5 * 60)]
+        df.drop(columns=['prev_time'], inplace=True)
     except Exception as e:
         print(f"查询数据失败: {e}")
         return None
@@ -86,32 +97,76 @@ def generate_attendance_excel(query_date):
     if df.empty:
         return None
 
-    df = df.sort_values(['姓名', '时间'])
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    # 创建 excel 子目录和日期子文件夹，确保存在
+    excel_dir = os.path.join(base_dir, 'excel', query_date)
+    os.makedirs(excel_dir, exist_ok=True)
+
+    # 将时间拆分为日期和时间，仅保留必要列
     df['考勤日期'] = df['时间'].dt.date
-    df['考勤时间'] = df['时间'].dt.time
-    df = df[['姓名', '考勤日期', '考勤时间', '部门名称', '机器号']]
-    df['时间戳'] = pd.to_datetime(df['考勤日期'].astype('str') + ' ' + df['考勤时间'].astype('str'))
+    df['考勤时间'] = df['时间'].dt.strftime('%H:%M')
 
-    def filter_record(group):
-        result = [group.iloc[0]]
-        for i in range(1, len(group)):
-            current = group.iloc[i]
-            previous = result[-1]
-            if current['时间戳'].hour != previous['时间戳'].hour:
-                result.append(current)
+    # --------- 1. 保存原始打卡数据（保留所有列） ---------
+    raw_path = os.path.join(excel_dir, f"{query_date}_attendance_raw.xlsx")
+    df_raw = df[['姓名', '时间', '机器号', '部门名称']]
+    # 为了保留原始时间列，重新读取一次含时间的 DataFrame
+    # 这里使用原始 df（包括 '时间' 列）
+    df_raw = df.assign(考勤日期=df['考勤日期'], 考勤时间=df['考勤时间'])
+    df_raw = df_raw[['姓名', '时间', '机器号', '部门名称']]
+    df_raw.to_excel(raw_path, index=False)
+
+    # --------- 2. 按部门、姓名、考勤日期聚合时间（换行符） ---------
+    df = df[['姓名', '考勤日期', '考勤时间', '部门名称']]
+    agg = (
+        df.groupby(['部门名称', '姓名', '考勤日期'], as_index=False)
+          .agg({
+              '考勤时间': lambda s: "\n".join(sorted(s.astype(str)))
+          })
+    )
+
+    # --------- 3. 写入聚合文件（多工作表） ---------
+    aggregated_path = os.path.join(excel_dir, f"{query_date}_attendance_aggregated.xlsx")
+    pivot_path = os.path.join(excel_dir, f"{query_date}_attendance_by_dept_pivot.xlsx")
+    with pd.ExcelWriter(aggregated_path, engine='openpyxl') as agg_writer, pd.ExcelWriter(pivot_path, engine='openpyxl') as pivot_writer:
+        for dept, sub_df in agg.groupby('部门名称'):
+            sheet_name = dept[:31]  # Excel sheet name max 31 chars
+            # Write raw aggregated sheet (no pivot)
+            sub_df.drop(columns='部门名称').to_excel(agg_writer, sheet_name=sheet_name, index=False)
+            # Create pivot: rows = 姓名, columns = 考勤日期, values = 考勤时间
+            pivot_df = sub_df.pivot(index='姓名', columns='考勤日期', values='考勤时间')
+            safe_name = sheet_name.replace('?', '').replace('*', '').replace(':', '').replace('/', '').replace('\\', '').replace('[', '').replace(']', '')
+            pivot_df.to_excel(pivot_writer, sheet_name=safe_name)
+
+    # --------- 4. 打包为 ZIP ---------
+    # 创建日志记录器
+    import logging
+    logger = logging.getLogger('attendance')
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+
+    zip_path = os.path.join(excel_dir, f"{query_date}_attendance_bundle.zip")
+    import zipfile
+
+    # 使用压缩模式并确保所有文件都被写入 zip 包
+    with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zipf:
+        for file_path in [raw_path, aggregated_path, pivot_path]:
+            if os.path.exists(file_path):
+                zipf.write(file_path, os.path.basename(file_path))
+                logger.info(f"Added {file_path} to zip bundle, size={os.path.getsize(file_path)} bytes")
             else:
-                minutes_diff = (current['时间戳'] - previous['时间戳']).total_seconds() / 60
-                if minutes_diff > 5:
-                    result.append(current)
-        return pd.DataFrame(result)
+                logger.warning(f"File not found, skipping: {file_path}")
 
-    filter_group = df.groupby(['姓名', '考勤日期'], group_keys=False).apply(filter_record)
-    filter_group.drop('时间戳', inplace=True, axis=1)
+    # 确认 zip 文件已创建
+    if os.path.exists(zip_path):
+        logger.info(f"Zip bundle created at {zip_path}, size={os.path.getsize(zip_path)} bytes")
+    else:
+        logger.error(f"Failed to create zip bundle at {zip_path}")
 
-    output_path = os.path.join(os.getcwd(), f'{query_date}_attendance.xlsx')
-    filter_group.to_excel(output_path, index=False)
-
-    return output_path
+    return zip_path
 
 @app.route('/')
 def index():
@@ -122,12 +177,25 @@ def generate_excel():
     query_date = request.args.get('query_date')
     if not query_date:
         return jsonify({'error': '日期格式无效'}), 400
-
+    # 调用生成函数获取文件路径
     file_path = generate_attendance_excel(query_date)
     if not file_path:
         return jsonify({'error': '未查询到数据或日期格式不正确，或数据库连接失败'}), 400
+    if os.path.exists(file_path):
+        # 返回下载链接而不是直接文件
+        download_url = f'/download/{query_date}'
+        return jsonify({'download_url': download_url})
+    else:
+        return jsonify({'error': '生成的文件未找到'}), 500
 
-    return send_file(file_path, as_attachment=True)
+@app.route('/download/<date>', methods=['GET'])
+def download_file(date):
+    # 构造 zip 文件路径
+    zip_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'excel', date, f"{date}_attendance_bundle.zip")
+    if os.path.exists(zip_path):
+        return send_file(zip_path, as_attachment=True, mimetype='application/zip', download_name=os.path.basename(zip_path))
+    else:
+        return jsonify({'error': '文件未找到'}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

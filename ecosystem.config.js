@@ -1,19 +1,27 @@
 module.exports = {
   apps: [
     {
-      name: "jhs-attendance",
+      name: "attendance-app",
       script: "app.py",
-      interpreter: "./.venv/Scripts/python.exe",
-      cwd: __dirname,
-      env: {
-        PORT: "5000"
+      interpreter: "python",
+      interpreter_kwargs: {
+        // Use the virtual environment python if it exists
+        // When running on Windows you can point to .venv\Scripts\python.exe
+        // Leave empty to use the system python in PATH
+        // Example: "c:/VSCODE/PYTHON3/考勤查询 - 副本/.venv/Scripts/python.exe"
       },
-      log_date_format: "YYYY-MM-DD HH:mm:ss",
-      out_file: "./logs/out.log",
-      error_file: "./logs/error.log",
-      combine_logs: true,
-      max_logs: "5M",
-      // keep only important logs (stdout and stderr) and rotate when exceeding 5MB
+      // If you want PM2 to automatically restart on file changes (useful for dev)
+      watch: false,
+      // Number of times to restart on failure before giving up
+      max_restarts: 10,
+      // Log files (optional, can be omitted to use default PM2 logs)
+      // output: "./logs/out.log",
+      // error: "./logs/err.log",
+      env: {
+        NODE_ENV: "production",
+        // You can set any custom env vars here, e.g., PORT
+        PORT: "5000"
+      }
     }
   ]
 };
