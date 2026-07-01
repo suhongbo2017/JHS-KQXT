@@ -33,15 +33,20 @@
 1. **环境依赖**：
    * Windows 操作系统
    * **Python 3.9+**（已安装并加入系统 `PATH`）
+   * **uv**（Python 包管理器，[安装指南](https://docs.astral.sh/uv/)）
    * 局域网内可正常访问考勤机共享数据库：`\\192.168.0.118\金恒晟共享文档\ZKTIMEACCESS\test.MDB`
    * 系统需安装 **Microsoft Access Database Engine** 驱动（以便 `pyodbc` 连接 `.MDB` 数据库）
 
-2. **虚拟环境与依赖安装**：
-   项目使用 `.venv` 虚拟环境。如在新机器部署，请执行：
+2. **安装依赖**（使用 uv）：
+
    ```bash
-   python -m venv .venv
-   .venv\Scripts\activate.bat
-   pip install flask waitress pandas pyodbc pywin32 openpyxl
+   # 在项目根目录下执行
+   uv pip install -r requirements.txt
+   ```
+
+   如果遇到权限问题，可加 `--system` 参数安装到全局 Python：
+   ```bash
+   uv pip install -r requirements.txt --system
    ```
 
 ---
@@ -50,13 +55,8 @@
 
 ### 方法一：本地开发与测试运行
 
-```cmd
-.venv\Scripts\python.exe app.py
-```
-或者激活虚拟环境后：
-```cmd
-.venv\Scripts\activate.bat
-python app.py
+```bash
+uv run python app.py
 ```
 启动后 Waitress 服务默认监听 `http://0.0.0.0:5000`。
 
@@ -66,38 +66,22 @@ python app.py
 
 ### 方法二：生产环境——使用 **PM2** 进程守护部署（推荐）
 
-目标 Windows Server 上已安装 PM2，只需以下步骤：
+目标 Windows Server 上已安装 PM2 和 uv，部署步骤如下：
 
-#### 1. 修改 `ecosystem.config.js` 中的 Python 解释器路径
+#### 1. 安装依赖
 
-打开 `ecosystem.config.js`，将 `interpreter` 改为项目虚拟环境的 Python 绝对路径：
-
-```javascript
-module.exports = {
-  apps: [
-    {
-      name: "attendance-app",
-      script: "app.py",
-      // ↓ 改为服务器上实际的虚拟环境路径
-      interpreter: "D:\\VSCODE\\PYTHON3\\考勤查询 - 副本\\.venv\\Scripts\\python.exe",
-      watch: false,
-      max_restarts: 10,
-      env: {
-        NODE_ENV: "production",
-        PORT: "5000"
-      }
-    }
-  ]
-};
+```bash
+cd D:\VSCODE\PYTHON3\考勤查询 - 副本
+uv pip install -r requirements.txt --system
 ```
 
 #### 2. 启动服务
 
-在项目根目录下执行：
-
 ```bash
 pm2 start ecosystem.config.js
 ```
+
+> `ecosystem.config.js` 中 `interpreter: ""` 表示使用系统 PATH 中的全局 Python，PM2 会直接调用 `app.py`。
 
 #### 3. 常用 PM2 命令
 
@@ -109,8 +93,6 @@ pm2 stop attendance-app      # 停止
 pm2 delete attendance-app    # 删除进程
 pm2 save                     # 保存当前进程列表（配合 startup 实现开机自启）
 ```
-
-> **注意**：`pm2 start` 时需在项目根目录执行，确保相对路径（如数据库连接、模板目录）能正确解析。
 
 ---
 
@@ -157,4 +139,4 @@ end_date_str = next_month_first.strftime('%Y-%m-%d 09:00:00')
 ## 📦 其他文件说明
 
 - `attendance_service.py` + `service_control.bat`：基于 pywin32 的 Windows Service 封装，备选部署方式，仅供参考。
-- `ecosystem.config.js`：PM2 的部署配置文件，需根据部署路径修改 `interpreter`。
+- `ecosystem.config.js`：PM2 的部署配置文件，`interpreter: ""` 使用系统全局 Python。
