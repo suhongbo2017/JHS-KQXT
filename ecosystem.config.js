@@ -3,9 +3,9 @@ module.exports = {
     {
       name: "attendance-app",
       script: "app.py",
-      // 如果 Python 已加入系统 PATH，留空即可；否则填绝对路径
-      // 例如："C:\Python312\python.exe"
-      interpreter: "",
+      // Python 绝对路径，请根据服务器实际安装位置修改
+      // 可在 cmd 中执行 where python 查看路径
+      interpreter: "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
       watch: false,
       max_restarts: 10,
       env: {
