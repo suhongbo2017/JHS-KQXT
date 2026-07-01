@@ -3,14 +3,14 @@ module.exports = {
     {
       name: "attendance-app",
       script: "app.py",
-      // Python 解释器路径（使用正斜杠，Windows 也支持）
-      // 使用 uv 创建虚拟环境后指向 .venv\Scripts\python.exe
+      // Python 解释器路径（根据服务器实际路径修改）
+      // 例如："D:/项目路径/.venv/Scripts/python.exe"
       interpreter: "D:/金恒晟共享文档/PC/JHS/JHS-KQXT/.venv/Scripts/python.exe",
       watch: false,
       max_restarts: 10,
       env: {
         NODE_ENV: "production",
-        PORT: "6000"
+        PORT: "5555"
       }
     }
   ]
