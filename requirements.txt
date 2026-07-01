@@ -1,0 +1,6 @@
+flask
+waitress
+pandas
+pyodbc
+pywin32
+openpyxl

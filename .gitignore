@@ -19,6 +19,7 @@ __pycache__/
 # Temporary or personal files
 *.log
 *.txt
+!requirements.txt
 
 temp/
 

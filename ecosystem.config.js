@@ -5,10 +5,7 @@ module.exports = {
       script: "app.py",
       interpreter: "python",
       interpreter_kwargs: {
-        // Use the virtual environment python if it exists
-        // When running on Windows you can point to .venv\Scripts\python.exe
-        // Leave empty to use the system python in PATH
-        // Example: "c:/VSCODE/PYTHON3/考勤查询 - 副本/.venv/Scripts/python.exe"
+        // 指向项目虚拟环境的 Python 解释器
       },
       // If you want PM2 to automatically restart on file changes (useful for dev)
       watch: false,
