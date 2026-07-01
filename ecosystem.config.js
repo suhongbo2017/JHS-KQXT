@@ -3,9 +3,9 @@ module.exports = {
     {
       name: "attendance-app",
       script: "app.py",
-      // Python 绝对路径，请根据服务器实际安装位置修改
-      // 可在 cmd 中执行 where python 查看路径
-      interpreter: "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+      // 使用 uv 管理的 Python 解释器
+      // 在 cmd 中执行 uv python list 可查看所有可用版本
+      interpreter: "C:\\Users\\Administrator\\AppData\\Roaming\\uv\\python\\cpython-3.11-windows-x86_64-none\\python.exe",
       watch: false,
       max_restarts: 10,
       env: {
